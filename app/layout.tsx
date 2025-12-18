@@ -1,3 +1,4 @@
+'use client'; // 加在这一行（文件开头）
 import './globals.css';
 import { createBrowserSupabaseClient } from '@supabase/auth-helpers-nextjs';
 import { SessionContextProvider } from '@supabase/auth-helpers-react';
