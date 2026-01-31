@@ -1,10 +1,10 @@
 'use client';
-import { useState, useEffect, useRef } from 'react';
-import { FixedSizeGrid } from 'react-window';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs/client';
-import { init } from '@airwallex/components-sdk';
-import { createAirwallexSession } from '@/lib/airwallex';
+import { useState, useEffect, useRef, Suspense } from 'react';
+import { Grid } from 'react-window';
+import { createBrowserClient } from '@supabase/ssr';
 import { v4 as uuidv4 } from 'uuid';
+import AuthModal from '@/components/AuthModal';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 // ======================== 基础配置常量 ========================
 const GRID_SIZE = 30; // 单个格子尺寸（px）
@@ -15,26 +15,19 @@ const MAX_GRIDS = 100000000; // 格子总数上限（1亿）
 const FILL_THRESHOLD = 0.5; // 填充率超过50%自动扩展
 const INITIAL_PRICE = 1; // 首次购买价格（美元）
 const MODIFY_PRICE = 99; // 单次修改价格（美元）
-const AD_GRID_COLOR = '#87CEEB80'; // 广告格子天蓝色（半透明）
-const AD_TEXT_COLOR = '#000000'; // AD字母颜色（黑色）
+const AD_GRID_COLOR = '#87CEEB'; // 广告格子天蓝色背景
+const AD_TEXT_COLOR = '#FFFFFF'; // 广告格子白色文字
 
-// 声明YouTube API类型（避免TS报错）
-declare global {
-  interface Window {
-    YT?: {
-      Player: new (elementId: string, options: any) => any;
-      PlayerState: {
-        ENDED: number;
-        PLAYING: number;
-      };
-    };
-  }
-}
+function UploadPageContent() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
 
-export default function Home() {
   // ======================== 核心状态管理 ========================
   // Supabase客户端
-  const supabase = createClientComponentClient();
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
   // 用户会话（登录状态）
   const [session, setSession] = useState<any>(null);
   // 所有格子数据
@@ -66,11 +59,13 @@ export default function Home() {
   // 用户已点赞的格子ID列表（防重复点赞）
   const [userLikedGrids, setUserLikedGrids] = useState<number[]>([]);
   // 格子容器Ref（用于滚动定位）
-  const gridRef = useRef<FixedSizeGrid>(null);
+  const gridRef = useRef<any>(null);
+  // YouTube播放器Ref（用于广告播放）
+  const youtubePlayerRef = useRef<any>(null);
   // 加载状态
   const [loading, setLoading] = useState(true);
-  // YouTube播放器Ref（监听广告播放状态）
-  const youtubePlayerRef = useRef<any>(null);
+  // Auth modal state
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
   // ======================== 初始化逻辑 ========================
   useEffect(() => {
@@ -78,44 +73,27 @@ export default function Home() {
       try {
         setLoading(true);
 
-        // 1. 加载YouTube IFrame API（用于监听广告播放状态）
-        if (!window.YT) {
-          await new Promise((resolve) => {
-            const tag = document.createElement('script');
-            tag.src = 'https://www.youtube.com/iframe_api';
-            const firstScriptTag = document.getElementsByTagName('script')[0];
-            firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
-            window.onYouTubeIframeAPIReady = resolve;
-          });
-        }
-
-        // 2. 获取用户登录会话
+        // 1. 获取用户登录会话
         const { data: sessionData } = await supabase.auth.getSession();
         setSession(sessionData.session);
+
+        // Check if user came from grids page with position parameter
+        const position = searchParams?.get('position')
+        if (position && !sessionData.session) {
+          // User not logged in but trying to purchase - show auth modal
+          setShowAuthModal(true)
+        }
+
         // 监听会话变化（登录/登出）
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
           (_, newSession) => setSession(newSession)
         );
 
-        // 3. 拉取所有格子数据
+        // 2. 拉取所有格子数据
         const { data: gridsData } = await supabase.from('grids').select('*').order('id');
         setGrids(gridsData || []);
 
-        // 4. 生成广告格子（每1000格随机1个，最多100个）
-        const adGridCount = Math.min(Math.floor((gridsData?.length || 0) / 1000), 100);
-        const adGridIds = Array.from({ length: adGridCount }, () =>
-          Math.floor(Math.random() * (gridsData?.length || 0)) + 1
-        );
-        await Promise.all(
-          adGridIds.map(id =>
-            supabase.from('grids').update({ 
-              ad_grid: true,
-              curtain_color: AD_GRID_COLOR // 广告格强制设为天蓝色
-            }).eq('id', id)
-          )
-        );
-
-        // 5. 动态扩展格子（填充率超50%时）
+        // 3. 动态扩展格子（填充率超50%时）
         const filledCount = (gridsData || []).filter(g => g.user_id).length;
         const fillRate = filledCount / totalGrids;
         if (fillRate >= FILL_THRESHOLD && totalGrids + EXPAND_STEP <= MAX_GRIDS) {
@@ -136,7 +114,7 @@ export default function Home() {
           await supabase.from('grids').insert(newGrids);
         }
 
-        // 6. 拉取用户点赞记录（防重复点赞）
+        // 4. 拉取用户点赞记录（防重复点赞）
         if (sessionData.session?.user) {
           const { data: likesData } = await supabase
             .from('grid_likes')
@@ -145,7 +123,7 @@ export default function Home() {
           setUserLikedGrids(likesData?.map(l => l.grid_id) || []);
         }
 
-        // 7. 拉取用户拥有的格子
+        // 5. 拉取用户拥有的格子
         if (sessionData.session?.user) {
           const { data: userGridsData } = await supabase
             .from('grids')
@@ -153,13 +131,6 @@ export default function Home() {
             .eq('user_id', sessionData.session.user.id);
           setUserGrids(userGridsData?.map(g => g.id) || []);
         }
-
-        // 8. 初始化Airwallex SDK
-        await init({
-          locale: 'zh-CN', // 支持 en/zh-CN 等
-          env: process.env.NODE_ENV === 'production' ? 'prod' : 'demo',
-          enabledElements: ['payments'],
-        });
 
         return () => {
           subscription.unsubscribe();
@@ -209,7 +180,7 @@ export default function Home() {
 
   // ======================== YouTube播放器初始化（广告播放） ========================
   useEffect(() => {
-    if (!currentViewGrid?.ad_grid || !window.YT) return;
+    if (!currentViewGrid?.ad_grid || !(window as any).YT) return;
 
     // 销毁原有播放器
     if (youtubePlayerRef.current) {
@@ -217,7 +188,7 @@ export default function Home() {
     }
 
     // 初始化新播放器
-    const player = new window.YT.Player('youtube-ad-player', {
+    const player = new (window as any).YT.Player('youtube-ad-player', {
       videoId: 'dQw4w9WgXcQ', // 广告视频ID（可替换为实际广告）
       playerVars: {
         autoplay: 1,
@@ -228,7 +199,7 @@ export default function Home() {
       events: {
         onStateChange: (event: any) => {
           // 状态0 = 播放结束
-          if (event.data === window.YT.PlayerState.ENDED) {
+          if (event.data === (window as any).YT?.PlayerState.ENDED) {
             handleAdPlaybackComplete(currentViewGrid.id);
           }
         },
@@ -329,8 +300,8 @@ export default function Home() {
     }
   };
 
-  // ======================== Airwallex支付逻辑 ========================
-  const handleAirwallexPay = async () => {
+  // ======================== 支付逻辑（PayPal） ========================
+  const handlePayment = async () => {
     if (!session || !selectedGrid || !editGrid.photoUrl) {
       return alert('请先上传照片并选择格子颜色！');
     }
@@ -350,24 +321,26 @@ export default function Home() {
       setLoading(true);
       // 确定支付金额（首次1美元，修改99美元）
       const amount = editGrid.priceType === 'initial' ? INITIAL_PRICE : MODIFY_PRICE;
-      // 创建Airwallex支付会话
-      const { checkoutUrl } = await createAirwallexSession(
-        selectedGrid,
-        session.user.id,
-        amount,
-        editGrid.priceType
-      );
 
-      // 预存编辑内容（修改时更新modified_at）
-      const updateData = {
-        curtain_color: editGrid.color,
-        photo_url: editGrid.photoUrl,
-        modified_at: new Date(),
-      };
-      await supabase.from('grids').update(updateData).eq('id', selectedGrid);
+      // PayPal支付流程
+      const response = await fetch('/api/paypal/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          gridId: selectedGrid,
+          userId: session.user.id,
+          amount,
+          priceType: editGrid.priceType,
+          curtainColor: editGrid.color,
+          photoUrl: editGrid.photoUrl,
+        }),
+      });
 
-      // 跳转至Airwallex托管支付页
-      window.location.href = checkoutUrl;
+      const { approvalUrl } = await response.json();
+      if (!approvalUrl) throw new Error('PayPal订单创建失败');
+
+      // 跳转至PayPal支付页
+      window.location.href = approvalUrl;
     } catch (error: any) {
       alert(`支付创建失败: ${error.message}`);
     } finally {
@@ -394,10 +367,10 @@ export default function Home() {
         user_id: session.user.id,
       });
 
-      // 2. 更新点赞数 + 延长存储时间（+1天，上限9999天）
-      const newStorageDays = Math.min((grid?.storage_days || 30) + 1, 9999);
+      // 2. 更新点赞数 + 延长存储时间（+1天，上限366天）
+      const newStorageDays = Math.min((grid?.storage_days || 30) + 1, 366);
       await supabase.from('grids').update({
-        like_count: (grid?.like_count || 0) + 1,
+        likes_count: (grid?.likes_count || 0) + 1,
         storage_days: newStorageDays,
       }).eq('id', gridId);
 
@@ -405,7 +378,7 @@ export default function Home() {
       setUserLikedGrids(prev => [...prev, gridId]);
       setGrids(prev => prev.map(g =>
         g.id === gridId
-          ? { ...g, like_count: (g.like_count || 0) + 1, storage_days: newStorageDays }
+          ? { ...g, likes_count: (g.likes_count || 0) + 1, storage_days: newStorageDays }
           : g
       ));
 
@@ -457,6 +430,25 @@ export default function Home() {
     setCurrentViewGrid(newGrid);
   };
 
+  // ======================== 探索功能：随机聚焦格子 ========================
+  const exploreRandomGrid = () => {
+    const randomGridId = Math.floor(Math.random() * totalGrids) + 1;
+    const row = Math.floor((randomGridId - 1) / COLS_PER_ROW);
+    const col = (randomGridId - 1) % COLS_PER_ROW;
+    gridRef.current?.scrollToItem({ row, column: col }, 'center');
+
+    // 自动打开该格子预览
+    const grid = grids.find(g => g.id === randomGridId) || {
+      id: randomGridId,
+      ad_grid: false,
+      photo_url: null,
+      curtain_color: '#80808080',
+      like_count: 0,
+      storage_days: 30,
+    };
+    setCurrentViewGrid(grid);
+  };
+
   // ======================== 单个格子渲染逻辑 ========================
   const renderGridCell = ({ columnIndex, rowIndex, style }: any) => {
     const gridIndex = rowIndex * COLS_PER_ROW + columnIndex;
@@ -490,6 +482,12 @@ export default function Home() {
           transition: 'background-color 0.2s',
         }}
         onClick={() => {
+          // Check if user is logged in before allowing purchase
+          if (!grid.user_id && !isAdGrid && !session) {
+            setShowAuthModal(true);
+            return;
+          }
+
           setSelectedGrid(gridId);
           // 广告格/已购买格子直接预览
           if (isAdGrid || grid.user_id) {
@@ -526,7 +524,7 @@ export default function Home() {
         {!isAdGrid && (
           <div className="absolute bottom-1 right-1 text-xs flex flex-col gap-0.5">
             <span className="text-pink-500 bg-black/50 px-1 rounded">
-              ❤️ {grid.like_count}
+              ❤️ {grid.likes_count}
             </span>
             {isUserGrid && (
               <span className={`bg-black/50 px-1 rounded ${grid.storage_days <= 0 ? 'text-red-500' : 'text-green-500'}`}>
@@ -558,6 +556,12 @@ export default function Home() {
         <div className="flex gap-3">
           {session ? (
             <>
+              <button
+                onClick={exploreRandomGrid}
+                className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 transition"
+              >
+                探索随机格子
+              </button>
               <button
                 onClick={() => {
                   if (userGrids.length === 0) return alert('你还没有购买任何格子！');
@@ -641,16 +645,16 @@ export default function Home() {
               </div>
             )}
 
-            {/* 付费按钮（广告格隐藏） */}
+            {/* 付费按钮（广告格隐藏，PayPal支付） */}
             {!grids.find(g => g.id === selectedGrid)?.ad_grid && (
               <button
-                onClick={handleAirwallexPay}
+                onClick={handlePayment}
                 disabled={!session || !editGrid.photoUrl || (editGrid.priceType === 'modify' && editGrid.isExpired)}
-                className="px-6 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700 transition disabled:bg-gray-600 disabled:cursor-not-allowed"
+                className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition disabled:bg-gray-600 disabled:cursor-not-allowed"
               >
                 {editGrid.priceType === 'initial'
-                  ? `支付 $${INITIAL_PRICE} 购买`
-                  : `支付 $${MODIFY_PRICE} 修改`
+                  ? `PayPal支付 $${INITIAL_PRICE}`
+                  : `PayPal支付 $${MODIFY_PRICE}`
                 }
               </button>
             )}
@@ -660,18 +664,20 @@ export default function Home() {
 
       {/* 格子容器 */}
       <main className="flex-1 overflow-hidden">
-        <FixedSizeGrid
-          ref={gridRef}
+        {/* @ts-ignore */}
+        <Grid
           columnCount={COLS_PER_ROW}
           columnWidth={GRID_SIZE}
           rowCount={Math.ceil(totalGrids / COLS_PER_ROW)}
           rowHeight={GRID_SIZE}
-          width="100%"
-          height="100%"
+          width={typeof window !== 'undefined' ? window.innerWidth : 1000}
+          height={typeof window !== 'undefined' ? window.innerHeight - 200 : 600}
           style={{ backgroundColor: 'black' }}
+          itemData={{}}
         >
+          {/* @ts-ignore */}
           {renderGridCell}
-        </FixedSizeGrid>
+        </Grid>
       </main>
 
       {/* 照片/广告预览弹窗 */}
@@ -736,7 +742,7 @@ export default function Home() {
                   onClick={() => handleLikeGrid(currentViewGrid.id)}
                   className="bg-pink-600 text-white p-3 rounded-full hover:bg-pink-700 transition flex items-center gap-2"
                 >
-                  ❤️ {currentViewGrid.like_count || 0}
+                  ❤️ {currentViewGrid.likes_count || 0}
                 </button>
                 <span className="bg-gray-700 text-white p-3 rounded-full text-sm">
                   剩余 {currentViewGrid.storage_days} 天
@@ -762,6 +768,26 @@ export default function Home() {
           </div>
         </div>
       )}
+
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        onSuccess={() => {
+          setShowAuthModal(false);
+          // Refresh session after login
+          supabase.auth.getSession().then(({ data: sessionData }) => {
+            setSession(sessionData.session);
+          });
+        }}
+      />
     </div>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gray-900 flex items-center justify-center text-white">加载中...</div>}>
+      <UploadPageContent />
+    </Suspense>
   );
 }
