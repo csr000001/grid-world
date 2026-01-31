@@ -4,6 +4,11 @@ import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
+interface GridData {
+  user_id: string | null;
+  photo_url: string | null;
+}
+
 function PaymentSuccessContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -30,7 +35,7 @@ function PaymentSuccessContent() {
           .from('grids')
           .select('user_id, photo_url')
           .eq('id', gridId)
-          .single();
+          .single<GridData>();
 
         if (grid?.user_id && grid?.photo_url) {
           setStatus('success');
