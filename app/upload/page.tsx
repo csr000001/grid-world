@@ -18,16 +18,17 @@ const MODIFY_PRICE = 99; // 单次修改价格（美元）
 const AD_GRID_COLOR = '#87CEEB'; // 广告格子天蓝色背景
 const AD_TEXT_COLOR = '#FFFFFF'; // 广告格子白色文字
 
+// Create Supabase client outside component to avoid multiple instances
+const supabase = createBrowserClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
+
 function UploadPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
   // ======================== 核心状态管理 ========================
-  // Supabase客户端
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
   // 用户会话（登录状态）
   const [session, setSession] = useState<any>(null);
   // 所有格子数据
@@ -450,7 +451,7 @@ function UploadPageContent() {
   };
 
   // ======================== 单个格子渲染逻辑 ========================
-  const renderGridCell = ({ columnIndex, rowIndex, style }: any) => {
+  const renderGridCell = ({ columnIndex, rowIndex, style, data }: any) => {
     const gridIndex = rowIndex * COLS_PER_ROW + columnIndex;
     if (gridIndex >= totalGrids) return null; // 超出总格子数不渲染
     const gridId = gridIndex + 1;
@@ -673,7 +674,8 @@ function UploadPageContent() {
           width={typeof window !== 'undefined' ? window.innerWidth : 1000}
           height={typeof window !== 'undefined' ? window.innerHeight - 200 : 600}
           style={{ backgroundColor: 'black' }}
-          itemData={{}}
+          itemData={{ grids, userGrids, totalGrids }}
+          ref={gridRef}
         >
           {/* @ts-ignore */}
           {renderGridCell}
