@@ -15,7 +15,6 @@ export interface Database {
         Row: {
           id: number
           user_id: string | null
-          ad_grid: boolean
           storage_days: number
           like_count: number
           curtain_color: string
@@ -26,7 +25,6 @@ export interface Database {
         Insert: {
           id?: number
           user_id?: string | null
-          ad_grid?: boolean
           storage_days?: number
           like_count?: number
           curtain_color?: string
@@ -37,7 +35,6 @@ export interface Database {
         Update: {
           id?: number
           user_id?: string | null
-          ad_grid?: boolean
           storage_days?: number
           like_count?: number
           curtain_color?: string

@@ -10,15 +10,12 @@ import { useRouter, useSearchParams } from 'next/navigation';
 interface GridData {
   id: number;
   user_id: string | null;
-  ad_grid: boolean;
   storage_days: number;
   like_count: number;
   curtain_color: string;
   photo_url: string | null;
   created_at: string;
   modified_at: string | null;
-  youtube_url?: string | null;
-  ad_link?: string | null;
 }
 
 // ======================== 基础配置常量 ========================
@@ -30,8 +27,6 @@ const MAX_GRIDS = 100000000; // 格子总数上限（1亿）
 const FILL_THRESHOLD = 0.5; // 填充率超过50%自动扩展
 const INITIAL_PRICE = 1; // 首次购买价格（美元）
 const MODIFY_PRICE = 99; // 单次修改价格（美元）
-const AD_GRID_COLOR = '#87CEEB'; // 广告格子天蓝色背景
-const AD_TEXT_COLOR = '#FFFFFF'; // 广告格子白色文字
 
 function UploadPageContent() {
   const router = useRouter()
@@ -46,7 +41,7 @@ function UploadPageContent() {
   const [totalGrids, setTotalGrids] = useState(INITIAL_GRIDS);
   // 用户拥有的格子ID列表
   const [userGrids, setUserGrids] = useState<number[]>([]);
-  // 当前预览的格子（照片/广告浏览）
+  // 当前预览的格子（照片浏览）
   const [currentViewGrid, setCurrentViewGrid] = useState<GridData | null>(null);
   // 选中的格子（编辑/付费）
   const [selectedGrid, setSelectedGrid] = useState<number | null>(null);
@@ -70,8 +65,6 @@ function UploadPageContent() {
   const [userLikedGrids, setUserLikedGrids] = useState<number[]>([]);
   // 格子容器Ref（用于滚动定位）
   const gridRef = useRef<any>(null);
-  // YouTube播放器Ref（用于广告播放）
-  const youtubePlayerRef = useRef<any>(null);
   // 加载状态
   const [loading, setLoading] = useState(true);
   // Auth modal state
@@ -110,10 +103,9 @@ function UploadPageContent() {
           const newTotal = Math.min(totalGrids + EXPAND_STEP, MAX_GRIDS);
           setTotalGrids(newTotal);
           // 批量新增扩展的空白格子
-          const newGrids: Omit<GridData, 'youtube_url' | 'ad_link'>[] = Array.from({ length: EXPAND_STEP }, (_, i) => ({
+          const newGrids: GridData[] = Array.from({ length: EXPAND_STEP }, (_, i) => ({
             id: totalGrids + i + 1,
             user_id: null,
-            ad_grid: false,
             storage_days: 30, // 初始存储30天
             like_count: 0,
             curtain_color: '#80808080',
@@ -121,7 +113,7 @@ function UploadPageContent() {
             created_at: new Date().toISOString(),
             modified_at: null,
           }));
-          await supabase.from('grids').insert(newGrids);
+          await supabase.from('grids').insert(newGrids as any);
         }
 
         // 4. 拉取用户点赞记录（防重复点赞）
@@ -130,7 +122,7 @@ function UploadPageContent() {
             .from('grid_likes')
             .select('grid_id')
             .eq('user_id', sessionData.session.user.id);
-          setUserLikedGrids(likesData?.map(l => l.grid_id) || []);
+          setUserLikedGrids((likesData as any)?.map((l: any) => l.grid_id) || []);
         }
 
         // 5. 拉取用户拥有的格子
@@ -139,15 +131,11 @@ function UploadPageContent() {
             .from('grids')
             .select('id, storage_days')
             .eq('user_id', sessionData.session.user.id);
-          setUserGrids(userGridsData?.map(g => g.id) || []);
+          setUserGrids((userGridsData as any)?.map((g: any) => g.id) || []);
         }
 
         return () => {
           subscription.unsubscribe();
-          // 销毁YouTube播放器
-          if (youtubePlayerRef.current) {
-            youtubePlayerRef.current.destroy();
-          }
         };
       } catch (error) {
         console.error('初始化失败:', error);
@@ -160,77 +148,6 @@ function UploadPageContent() {
     initializeApp();
   }, [supabase, totalGrids]);
 
-  // ======================== 广告播放完成处理逻辑 ========================
-  const handleAdPlaybackComplete = async (gridId: number) => {
-    try {
-      // 1. 更新Supabase：将广告格恢复为空白格
-      await supabase
-        .from('grids')
-        .update({
-          ad_grid: false,
-          curtain_color: '#80808080', // 恢复为默认灰色
-        })
-        .eq('id', gridId);
-
-      // 2. 更新本地状态：同步格子数据
-      setGrids(prev => prev.map(grid => 
-        grid.id === gridId 
-          ? { ...grid, ad_grid: false, curtain_color: '#80808080' } 
-          : grid
-      ));
-
-      // 3. 关闭预览弹窗
-      setCurrentViewGrid(null);
-      alert(`广告播放完成！格子 ${gridId} 已恢复为空白格，可正常购买`);
-    } catch (error) {
-      console.error('恢复空白格失败:', error);
-      alert('广告播放完成，但格子恢复失败，请刷新重试');
-    }
-  };
-
-  // ======================== YouTube播放器初始化（广告播放） ========================
-  useEffect(() => {
-    if (!currentViewGrid?.ad_grid || !(window as any).YT) return;
-
-    // 销毁原有播放器
-    if (youtubePlayerRef.current) {
-      youtubePlayerRef.current.destroy();
-    }
-
-    // 初始化新播放器
-    const player = new (window as any).YT.Player('youtube-ad-player', {
-      videoId: 'dQw4w9WgXcQ', // 广告视频ID（可替换为实际广告）
-      playerVars: {
-        autoplay: 1,
-        controls: 1,
-        modestbranding: 1,
-        rel: 0, // 不显示相关视频
-      },
-      events: {
-        onStateChange: (event: any) => {
-          // 状态0 = 播放结束
-          if (event.data === (window as any).YT?.PlayerState.ENDED) {
-            handleAdPlaybackComplete(currentViewGrid.id);
-          }
-        },
-        onError: (error: any) => {
-          console.error('广告播放错误:', error);
-          alert('广告播放出错，格子已恢复为空白格');
-          handleAdPlaybackComplete(currentViewGrid.id);
-        }
-      }
-    });
-
-    youtubePlayerRef.current = player;
-
-    // 清理函数
-    return () => {
-      if (youtubePlayerRef.current) {
-        youtubePlayerRef.current.destroy();
-      }
-    };
-  }, [currentViewGrid]);
-
   // ======================== 选中格子时的状态更新 ========================
   useEffect(() => {
     if (!selectedGrid || !session) return;
@@ -238,19 +155,6 @@ function UploadPageContent() {
     const updateEditState = () => {
       const grid = grids.find(g => g.id === selectedGrid);
       if (!grid) return;
-
-      // 广告格：不可编辑，但允许点击播放广告
-      if (grid.ad_grid) {
-        setEditGrid({
-          id: null,
-          color: '#80808080',
-          photo: null,
-          photoUrl: null,
-          priceType: 'initial',
-          isExpired: true,
-        });
-        return;
-      }
 
       // 已购买的格子：判断是否到期
       if (grid.user_id === session.user.id) {
@@ -316,12 +220,6 @@ function UploadPageContent() {
       return alert('请先上传照片并选择格子颜色！');
     }
 
-    // 广告格不可支付（即使误触发）
-    const grid = grids.find(g => g.id === selectedGrid);
-    if (grid?.ad_grid) {
-      return alert('请先播放广告，广告播放完成后格子将恢复为可购买状态！');
-    }
-
     // 修改场景：判断是否到期
     if (editGrid.priceType === 'modify' && editGrid.isExpired) {
       return alert('该格子已到期，无法修改（可通过点赞延长存储时间）');
@@ -363,11 +261,7 @@ function UploadPageContent() {
     if (!session) return alert('请先登录后点赞！');
     if (userLikedGrids.includes(gridId)) return alert('你已为该格子点赞过！');
 
-    // 广告格不可点赞
     const grid = grids.find(g => g.id === gridId);
-    if (grid?.ad_grid) {
-      return alert('请先播放广告，广告播放完成后可正常点赞！');
-    }
 
     try {
       setLoading(true);
@@ -375,12 +269,12 @@ function UploadPageContent() {
       await supabase.from('grid_likes').insert({
         grid_id: gridId,
         user_id: session.user.id,
-      });
+      } as any);
 
       // 2. 更新点赞数 + 延长存储时间（+1天，上限366天）
       const newStorageDays = Math.min((grid?.storage_days || 30) + 1, 366);
-      await supabase.from('grids').update({
-        likes_count: (grid?.likes_count || 0) + 1,
+      await (supabase.from('grids') as any).update({
+        like_count: (grid?.like_count || 0) + 1,
         storage_days: newStorageDays,
       }).eq('id', gridId);
 
@@ -388,7 +282,7 @@ function UploadPageContent() {
       setUserLikedGrids(prev => [...prev, gridId]);
       setGrids(prev => prev.map(g =>
         g.id === gridId
-          ? { ...g, likes_count: (g.likes_count || 0) + 1, storage_days: newStorageDays }
+          ? { ...g, like_count: (g.like_count || 0) + 1, storage_days: newStorageDays }
           : g
       ));
 
@@ -431,11 +325,13 @@ function UploadPageContent() {
     // 加载新格子内容（空白格显示纯白图片）
     const newGrid = grids.find(g => g.id === newId) || {
       id: newId,
-      ad_grid: false,
+      user_id: null,
       photo_url: 'https://via.placeholder.com/400x400/FFFFFF/FFFFFF', // 纯白占位图
       curtain_color: '#80808080',
       like_count: 0,
       storage_days: 30,
+      created_at: new Date().toISOString(),
+      modified_at: null,
     };
     setCurrentViewGrid(newGrid);
   };
@@ -450,11 +346,13 @@ function UploadPageContent() {
     // 自动打开该格子预览
     const grid = grids.find(g => g.id === randomGridId) || {
       id: randomGridId,
-      ad_grid: false,
+      user_id: null,
       photo_url: null,
       curtain_color: '#80808080',
       like_count: 0,
       storage_days: 30,
+      created_at: new Date().toISOString(),
+      modified_at: null,
     };
     setCurrentViewGrid(grid);
   };
@@ -465,21 +363,19 @@ function UploadPageContent() {
     if (gridIndex >= totalGrids) return null; // 超出总格子数不渲染
     const gridId = gridIndex + 1;
     const grid = grids.find(g => g.id === gridId) || {
-      ad_grid: false,
+      id: gridId,
       curtain_color: '#80808080',
       user_id: null,
       like_count: 0,
       storage_days: 30,
+      photo_url: null,
+      created_at: new Date().toISOString(),
+      modified_at: null,
     };
     const isUserGrid = userGrids.includes(gridId);
-    const isAdGrid = grid.ad_grid;
 
-    // 广告格强制使用天蓝色背景
-    const gridBgColor = isAdGrid ? AD_GRID_COLOR : grid.curtain_color;
-    // 广告格边框特殊样式
-    const gridBorder = isAdGrid 
-      ? '2px solid #4682B4' // 深天蓝色边框，突出广告格
-      : isUserGrid ? '2px solid gold' : '1px solid #333';
+    const gridBgColor = grid.curtain_color;
+    const gridBorder = isUserGrid ? '2px solid gold' : '1px solid #333';
 
     return (
       <div
@@ -487,62 +383,41 @@ function UploadPageContent() {
           ...style,
           backgroundColor: gridBgColor,
           border: gridBorder,
-          cursor: isAdGrid ? 'pointer' : 'pointer', // 广告格允许点击
+          cursor: 'pointer',
           position: 'relative',
           transition: 'background-color 0.2s',
         }}
         onClick={() => {
           // Check if user is logged in before allowing purchase
-          if (!grid.user_id && !isAdGrid && !session) {
+          if (!grid.user_id && !session) {
             setShowAuthModal(true);
             return;
           }
 
           setSelectedGrid(gridId);
-          // 广告格/已购买格子直接预览
-          if (isAdGrid || grid.user_id) {
+          // 已购买格子直接预览
+          if (grid.user_id) {
             setCurrentViewGrid(grid);
           }
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor = isAdGrid 
-            ? '#87CEEB90' // 广告格hover加深天蓝色
-            : gridBgColor.replace('80808080', '90909080');
+          e.currentTarget.style.backgroundColor = gridBgColor.replace('80808080', '90909080');
         }}
         onMouseLeave={(e) => {
           e.currentTarget.style.backgroundColor = gridBgColor;
         }}
       >
-        {/* 广告格专属：居中显示AD字母 */}
-        {isAdGrid && (
-          <div 
-            className="absolute inset-0 flex flex-col items-center justify-center"
-            style={{
-              color: AD_TEXT_COLOR,
-              fontSize: '12px',
-              fontWeight: 900, // 加粗
-              letterSpacing: '1px', // 字母间距
-              textShadow: '0 0 2px #ffffff', // 文字阴影，提升可读性
-            }}
-          >
-            <div>AD</div>
-            <div style={{ fontSize: '8px', marginTop: '2px' }}>点击播放广告</div>
-          </div>
-        )}
-
-        {/* 非广告格：显示点赞数 + 剩余天数 */}
-        {!isAdGrid && (
-          <div className="absolute bottom-1 right-1 text-xs flex flex-col gap-0.5">
-            <span className="text-pink-500 bg-black/50 px-1 rounded">
-              ❤️ {grid.likes_count}
+        {/* 显示点赞数 + 剩余天数 */}
+        <div className="absolute bottom-1 right-1 text-xs flex flex-col gap-0.5">
+          <span className="text-pink-500 bg-black/50 px-1 rounded">
+            ❤️ {grid.like_count}
+          </span>
+          {isUserGrid && (
+            <span className={`bg-black/50 px-1 rounded ${grid.storage_days <= 0 ? 'text-red-500' : 'text-green-500'}`}>
+              {grid.storage_days}天
             </span>
-            {isUserGrid && (
-              <span className={`bg-black/50 px-1 rounded ${grid.storage_days <= 0 ? 'text-red-500' : 'text-green-500'}`}>
-                {grid.storage_days}天
-              </span>
-            )}
-          </div>
-        )}
+          )}
+        </div>
       </div>
     );
   };
@@ -607,18 +482,11 @@ function UploadPageContent() {
         <section className="p-4 bg-gray-800 border-b border-gray-700">
           {/* 自定义描述文字 */}
           <p className="text-sm mb-3 text-gray-300">
-            描述xxxxxxxxxxxx：首次购买格子价格1美元（含30天存储），已购买且未到期的格子可随时修改（99美元/次），每收到1个点赞可延长1天存储时间（上限9999天），到期后不可修改。【广告格子点击播放广告，播放完成后恢复为空白格可购买】
+            描述xxxxxxxxxxxx：首次购买格子价格1美元（含30天存储），已购买且未到期的格子可随时修改（99美元/次），每收到1个点赞可延长1天存储时间（上限9999天），到期后不可修改。
           </p>
 
-          {/* 广告格提示 */}
-          {grids.find(g => g.id === selectedGrid)?.ad_grid && (
-            <div className="mb-3 text-sm text-blue-400">
-              ⚡ 该格子为广告格，点击预览弹窗播放广告，播放完成后即可正常购买！
-            </div>
-          )}
-
           {/* 到期提示（仅修改场景） */}
-          {!grids.find(g => g.id === selectedGrid)?.ad_grid && editGrid.priceType === 'modify' && (
+          {editGrid.priceType === 'modify' && (
             <div className="mb-3 text-sm">
               {editGrid.isExpired ? (
                 <span className="text-red-500">⚠️ 该格子已到期，无法修改（可通过点赞延长有效期）</span>
@@ -629,45 +497,39 @@ function UploadPageContent() {
           )}
 
           <div className="flex flex-wrap gap-4 items-center">
-            {/* 颜色选择器（广告格隐藏） */}
-            {!grids.find(g => g.id === selectedGrid)?.ad_grid && (
-              <div className="flex items-center gap-2">
-                <label className="text-sm">格子颜色：</label>
-                <input
-                  type="color"
-                  value={editGrid.color.replace('80808080', '808080')} // 兼容半透明值
-                  onChange={(e) => setEditGrid(prev => ({ ...prev, color: e.target.value + '80' }))}
-                  className="w-8 h-8 border-0 rounded-full cursor-pointer"
-                />
-              </div>
-            )}
+            {/* 颜色选择器 */}
+            <div className="flex items-center gap-2">
+              <label className="text-sm">格子颜色：</label>
+              <input
+                type="color"
+                value={editGrid.color.replace('80808080', '808080')} // 兼容半透明值
+                onChange={(e) => setEditGrid(prev => ({ ...prev, color: e.target.value + '80' }))}
+                className="w-8 h-8 border-0 rounded-full cursor-pointer"
+              />
+            </div>
 
-            {/* 照片上传（广告格隐藏） */}
-            {!grids.find(g => g.id === selectedGrid)?.ad_grid && (
-              <div className="flex items-center gap-2">
-                <label className="text-sm">上传照片：</label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handlePhotoUpload}
-                  className="text-sm text-gray-300"
-                />
-              </div>
-            )}
+            {/* 照片上传 */}
+            <div className="flex items-center gap-2">
+              <label className="text-sm">上传照片：</label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handlePhotoUpload}
+                className="text-sm text-gray-300"
+              />
+            </div>
 
-            {/* 付费按钮（广告格隐藏，PayPal支付） */}
-            {!grids.find(g => g.id === selectedGrid)?.ad_grid && (
-              <button
-                onClick={handlePayment}
-                disabled={!session || !editGrid.photoUrl || (editGrid.priceType === 'modify' && editGrid.isExpired)}
-                className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition disabled:bg-gray-600 disabled:cursor-not-allowed"
-              >
-                {editGrid.priceType === 'initial'
-                  ? `PayPal支付 $${INITIAL_PRICE}`
-                  : `PayPal支付 $${MODIFY_PRICE}`
-                }
-              </button>
-            )}
+            {/* 付费按钮（PayPal支付） */}
+            <button
+              onClick={handlePayment}
+              disabled={!session || !editGrid.photoUrl || (editGrid.priceType === 'modify' && editGrid.isExpired)}
+              className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition disabled:bg-gray-600 disabled:cursor-not-allowed"
+            >
+              {editGrid.priceType === 'initial'
+                ? `PayPal支付 $${INITIAL_PRICE}`
+                : `PayPal支付 $${MODIFY_PRICE}`
+              }
+            </button>
           </div>
         </section>
       )}
@@ -691,80 +553,61 @@ function UploadPageContent() {
         </Grid>
       </main>
 
-      {/* 照片/广告预览弹窗 */}
+      {/* 照片预览弹窗 */}
       {currentViewGrid && (
         <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-50 p-4">
           <div className="relative max-w-4xl max-h-[90vh]">
-            {/* 导航按钮（非广告格显示） */}
-            {!currentViewGrid.ad_grid && (
-              <>
-                <button
-                  onClick={() => navigateGrid('up')}
-                  className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-full mb-4 bg-gray-700 p-3 rounded-full hover:bg-gray-600 transition z-10"
-                  aria-label="上一个格子"
-                >
-                  ↑
-                </button>
-                <button
-                  onClick={() => navigateGrid('down')}
-                  className="absolute top-1/2 left-1/2 -translate-x-1/2 translate-y-full mt-4 bg-gray-700 p-3 rounded-full hover:bg-gray-600 transition z-10"
-                  aria-label="下一个格子"
-                >
-                  ↓
-                </button>
-                <button
-                  onClick={() => navigateGrid('left')}
-                  className="absolute left-0 top-1/2 -translate-y-1/2 mr-4 bg-gray-700 p-3 rounded-full hover:bg-gray-600 transition z-10"
-                  aria-label="左边格子"
-                >
-                  ←
-                </button>
-                <button
-                  onClick={() => navigateGrid('right')}
-                  className="absolute right-0 top-1/2 -translate-y-1/2 ml-4 bg-gray-700 p-3 rounded-full hover:bg-gray-600 transition z-10"
-                  aria-label="右边格子"
-                >
-                  →
-                </button>
-              </>
-            )}
+            {/* 导航按钮 */}
+            <>
+              <button
+                onClick={() => navigateGrid('up')}
+                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-full mb-4 bg-gray-700 p-3 rounded-full hover:bg-gray-600 transition z-10"
+                aria-label="上一个格子"
+              >
+                ↑
+              </button>
+              <button
+                onClick={() => navigateGrid('down')}
+                className="absolute top-1/2 left-1/2 -translate-x-1/2 translate-y-full mt-4 bg-gray-700 p-3 rounded-full hover:bg-gray-600 transition z-10"
+                aria-label="下一个格子"
+              >
+                ↓
+              </button>
+              <button
+                onClick={() => navigateGrid('left')}
+                className="absolute left-0 top-1/2 -translate-y-1/2 mr-4 bg-gray-700 p-3 rounded-full hover:bg-gray-600 transition z-10"
+                aria-label="左边格子"
+              >
+                ←
+              </button>
+              <button
+                onClick={() => navigateGrid('right')}
+                className="absolute right-0 top-1/2 -translate-y-1/2 ml-4 bg-gray-700 p-3 rounded-full hover:bg-gray-600 transition z-10"
+                aria-label="右边格子"
+              >
+                →
+              </button>
+            </>
 
             {/* 内容展示 */}
-            {currentViewGrid.ad_grid ? (
-              // 广告格：YouTube播放器容器
-              <div 
-                id="youtube-ad-player" 
-                className="max-w-full max-h-[80vh] object-contain"
-                style={{ width: '100%', height: '100%' }}
-              ></div>
-            ) : (
-              // 普通格子：照片/纯白占位图
-              <img
-                src={currentViewGrid.photo_url || 'https://via.placeholder.com/800x600/FFFFFF/FFFFFF'}
-                alt={`格子 ${currentViewGrid.id} 内容`}
-                className="max-w-full max-h-[80vh] object-contain rounded"
-              />
-            )}
+            <img
+              src={currentViewGrid.photo_url || 'https://via.placeholder.com/800x600/FFFFFF/FFFFFF'}
+              alt={`格子 ${currentViewGrid.id} 内容`}
+              className="max-w-full max-h-[80vh] object-contain rounded"
+            />
 
-            {/* 点赞按钮 + 剩余天数（非广告格显示） */}
-            {session && !currentViewGrid.ad_grid && (
+            {/* 点赞按钮 + 剩余天数 */}
+            {session && (
               <div className="absolute bottom-4 right-4 flex gap-2">
                 <button
                   onClick={() => handleLikeGrid(currentViewGrid.id)}
                   className="bg-pink-600 text-white p-3 rounded-full hover:bg-pink-700 transition flex items-center gap-2"
                 >
-                  ❤️ {currentViewGrid.likes_count || 0}
+                  ❤️ {currentViewGrid.like_count || 0}
                 </button>
                 <span className="bg-gray-700 text-white p-3 rounded-full text-sm">
                   剩余 {currentViewGrid.storage_days} 天
                 </span>
-              </div>
-            )}
-
-            {/* 广告格提示（播放中） */}
-            {currentViewGrid.ad_grid && (
-              <div className="absolute top-4 left-4 bg-blue-600 text-white p-2 rounded text-sm">
-                广告播放中...播放完成后格子将恢复为空白格
               </div>
             )}
 

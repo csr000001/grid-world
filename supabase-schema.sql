@@ -6,7 +6,6 @@
 CREATE TABLE IF NOT EXISTS grids (
   id BIGSERIAL PRIMARY KEY,
   user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
-  ad_grid BOOLEAN DEFAULT FALSE,
   storage_days INTEGER DEFAULT 30,
   like_count INTEGER DEFAULT 0,
   curtain_color VARCHAR(20) DEFAULT '#80808080',
@@ -17,7 +16,6 @@ CREATE TABLE IF NOT EXISTS grids (
 
 -- 创建索引以提升查询性能
 CREATE INDEX IF NOT EXISTS idx_grids_user_id ON grids(user_id);
-CREATE INDEX IF NOT EXISTS idx_grids_ad_grid ON grids(ad_grid);
 CREATE INDEX IF NOT EXISTS idx_grids_storage_days ON grids(storage_days);
 
 -- 2. 创建grid_likes表（点赞记录表，防止重复点赞）
@@ -34,11 +32,10 @@ CREATE INDEX IF NOT EXISTS idx_grid_likes_grid_id ON grid_likes(grid_id);
 CREATE INDEX IF NOT EXISTS idx_grid_likes_user_id ON grid_likes(user_id);
 
 -- 3. 初始化10000个空白格子
-INSERT INTO grids (id, user_id, ad_grid, storage_days, like_count, curtain_color, photo_url)
+INSERT INTO grids (id, user_id, storage_days, like_count, curtain_color, photo_url)
 SELECT
   generate_series(1, 10000) AS id,
   NULL AS user_id,
-  FALSE AS ad_grid,
   30 AS storage_days,
   0 AS like_count,
   '#80808080' AS curtain_color,
@@ -84,10 +81,9 @@ BEGIN
 
   -- 如果填充率超过50%且未达到上限，则扩展10000个格子
   IF fill_rate >= 0.5 AND total_grids < max_grids THEN
-    INSERT INTO grids (user_id, ad_grid, storage_days, like_count, curtain_color, photo_url)
+    INSERT INTO grids (user_id, storage_days, like_count, curtain_color, photo_url)
     SELECT
       NULL,
-      FALSE,
       30,
       0,
       '#80808080',
