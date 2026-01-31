@@ -410,11 +410,11 @@ function UploadPageContent() {
         {/* 显示点赞数 + 剩余天数 */}
         <div className="absolute bottom-1 right-1 text-xs flex flex-col gap-0.5">
           <span className="text-pink-500 bg-black/50 px-1 rounded">
-            ❤️ {grid.like_count}
+            ❤️ {grid.like_count || 0}
           </span>
           {isUserGrid && (
-            <span className={`bg-black/50 px-1 rounded ${grid.storage_days <= 0 ? 'text-red-500' : 'text-green-500'}`}>
-              {grid.storage_days}天
+            <span className={`bg-black/50 px-1 rounded ${(grid.storage_days || 0) <= 0 ? 'text-red-500' : 'text-green-500'}`}>
+              {grid.storage_days || 0}天
             </span>
           )}
         </div>
@@ -606,7 +606,7 @@ function UploadPageContent() {
                   ❤️ {currentViewGrid.like_count || 0}
                 </button>
                 <span className="bg-gray-700 text-white p-3 rounded-full text-sm">
-                  剩余 {currentViewGrid.storage_days} 天
+                  剩余 {currentViewGrid.storage_days || 0} 天
                 </span>
               </div>
             )}
