@@ -110,7 +110,7 @@ function UploadPageContent() {
           const newTotal = Math.min(totalGrids + EXPAND_STEP, MAX_GRIDS);
           setTotalGrids(newTotal);
           // 批量新增扩展的空白格子
-          const newGrids = Array.from({ length: EXPAND_STEP }, (_, i) => ({
+          const newGrids: Omit<GridData, 'youtube_url' | 'ad_link'>[] = Array.from({ length: EXPAND_STEP }, (_, i) => ({
             id: totalGrids + i + 1,
             user_id: null,
             ad_grid: false,
@@ -118,7 +118,7 @@ function UploadPageContent() {
             like_count: 0,
             curtain_color: '#80808080',
             photo_url: null,
-            created_at: new Date(),
+            created_at: new Date().toISOString(),
             modified_at: null,
           }));
           await supabase.from('grids').insert(newGrids);
