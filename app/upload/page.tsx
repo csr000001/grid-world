@@ -6,6 +6,21 @@ import { v4 as uuidv4 } from 'uuid';
 import AuthModal from '@/components/AuthModal';
 import { useRouter, useSearchParams } from 'next/navigation';
 
+// ======================== 类型定义 ========================
+interface GridData {
+  id: number;
+  user_id: string | null;
+  ad_grid: boolean;
+  storage_days: number;
+  like_count: number;
+  curtain_color: string;
+  photo_url: string | null;
+  created_at: string;
+  modified_at: string | null;
+  youtube_url?: string | null;
+  ad_link?: string | null;
+}
+
 // ======================== 基础配置常量 ========================
 const GRID_SIZE = 30; // 单个格子尺寸（px）
 const COLS_PER_ROW = 100; // 每行格子数
@@ -26,13 +41,13 @@ function UploadPageContent() {
   // 用户会话（登录状态）
   const [session, setSession] = useState<any>(null);
   // 所有格子数据
-  const [grids, setGrids] = useState<any[]>([]);
+  const [grids, setGrids] = useState<GridData[]>([]);
   // 当前总格子数（动态扩展）
   const [totalGrids, setTotalGrids] = useState(INITIAL_GRIDS);
   // 用户拥有的格子ID列表
   const [userGrids, setUserGrids] = useState<number[]>([]);
   // 当前预览的格子（照片/广告浏览）
-  const [currentViewGrid, setCurrentViewGrid] = useState<any>(null);
+  const [currentViewGrid, setCurrentViewGrid] = useState<GridData | null>(null);
   // 选中的格子（编辑/付费）
   const [selectedGrid, setSelectedGrid] = useState<number | null>(null);
   // 编辑格子状态
