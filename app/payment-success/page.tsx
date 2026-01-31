@@ -2,15 +2,11 @@
 
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { createBrowserClient } from '@supabase/ssr';
+import { supabase } from '@/lib/supabase';
 
 function PaymentSuccessContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
   const [status, setStatus] = useState<'processing' | 'success' | 'error'>('processing');
   const [message, setMessage] = useState('正在处理支付结果...');
 
@@ -51,7 +47,7 @@ function PaymentSuccessContent() {
     };
 
     processPayment();
-  }, [searchParams, supabase]);
+  }, [searchParams]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-black">

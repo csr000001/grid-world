@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useRef, Suspense } from 'react';
 import { Grid } from 'react-window';
-import { createBrowserClient } from '@supabase/ssr';
+import { supabase } from '@/lib/supabase';
 import { v4 as uuidv4 } from 'uuid';
 import AuthModal from '@/components/AuthModal';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -17,12 +17,6 @@ const INITIAL_PRICE = 1; // 首次购买价格（美元）
 const MODIFY_PRICE = 99; // 单次修改价格（美元）
 const AD_GRID_COLOR = '#87CEEB'; // 广告格子天蓝色背景
 const AD_TEXT_COLOR = '#FFFFFF'; // 广告格子白色文字
-
-// Create Supabase client outside component to avoid multiple instances
-const supabase = createBrowserClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
 
 function UploadPageContent() {
   const router = useRouter()
@@ -674,7 +668,7 @@ function UploadPageContent() {
           width={typeof window !== 'undefined' ? window.innerWidth : 1000}
           height={typeof window !== 'undefined' ? window.innerHeight - 200 : 600}
           style={{ backgroundColor: 'black' }}
-          itemData={{ grids, userGrids, totalGrids }}
+          itemData={{ grids: grids || {}, userGrids: userGrids || {}, totalGrids: totalGrids || INITIAL_GRIDS }}
           ref={gridRef}
         >
           {/* @ts-ignore */}
