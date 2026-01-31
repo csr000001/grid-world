@@ -100,7 +100,7 @@ function UploadPageContent() {
         );
 
         // 2. 拉取所有格子数据
-        const { data: gridsData } = await supabase.from('grids').select('*').order('id');
+        const { data: gridsData } = await supabase.from('grids').select('*').order('id') as { data: GridData[] | null };
         setGrids(gridsData || []);
 
         // 3. 动态扩展格子（填充率超50%时）
