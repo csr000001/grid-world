@@ -1,14 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
 const PAYPAL_API_BASE = process.env.NODE_ENV === 'production'
   ? 'https://api-m.paypal.com'
   : 'https://api-m.sandbox.paypal.com';
+
+// 创建 Supabase 客户端（运行时）
+function getSupabaseClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error('Missing Supabase environment variables');
+  }
+
+  return createClient(supabaseUrl, supabaseKey);
+}
 
 // 验证PayPal Webhook签名
 async function verifyWebhookSignature(req: NextRequest, body: string) {
@@ -81,6 +88,9 @@ export async function POST(req: NextRequest) {
       }
 
       const { gridId, userId, priceType, curtainColor, photoUrl } = JSON.parse(customId);
+
+      // 获取 Supabase 客户端
+      const supabase = getSupabaseClient();
 
       // 首次购买：绑定用户 + 初始化存储天数 + 保存照片和颜色
       if (priceType === 'initial') {
