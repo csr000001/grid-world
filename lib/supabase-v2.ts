@@ -66,6 +66,29 @@ async function safeQuery<T>(
 export const supabase = {
   // 查询方法
   from: (table: string) => {
+    // Check configuration BEFORE creating any query chains
+    if (!isConfigured) {
+      const emptyResult = Promise.resolve({ data: [], error: null })
+      const emptyNullResult = Promise.resolve({ data: null, error: null })
+
+      return {
+        select: () => ({
+          order: () => emptyResult,
+          eq: () => emptyResult,
+          single: () => emptyNullResult,
+          limit: () => emptyResult,
+          then: (resolve: any) => emptyResult.then(resolve),
+        }),
+        insert: () => emptyNullResult,
+        update: () => ({
+          eq: () => emptyNullResult,
+        }),
+        delete: () => ({
+          eq: () => emptyNullResult,
+        }),
+      }
+    }
+
     const originalFrom = client.from(table)
 
     return {
