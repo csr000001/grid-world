@@ -73,27 +73,66 @@ export const supabase = {
         const query = originalFrom.select(columns)
 
         return {
-          order: (column: string, options?: any) =>
-            safeQuery(() => query.order(column, options), []),
-          eq: (column: string, value: any) =>
-            safeQuery(() => query.eq(column, value), []),
-          single: () =>
-            safeQuery(() => query.single(), null),
-          limit: (count: number) =>
-            safeQuery(() => query.limit(count), []),
-          then: (resolve: any, reject: any) =>
-            safeQuery(() => query, []).then(resolve, reject),
+          order: (column: string, options?: any) => {
+            const orderedQuery = query.order(column, options)
+            return safeQuery(async () => {
+              const result = await orderedQuery
+              return result
+            }, [])
+          },
+          eq: (column: string, value: any) => {
+            const filteredQuery = query.eq(column, value)
+            return safeQuery(async () => {
+              const result = await filteredQuery
+              return result
+            }, [])
+          },
+          single: () => {
+            const singleQuery = query.single()
+            return safeQuery(async () => {
+              const result = await singleQuery
+              return result
+            }, null)
+          },
+          limit: (count: number) => {
+            const limitedQuery = query.limit(count)
+            return safeQuery(async () => {
+              const result = await limitedQuery
+              return result
+            }, [])
+          },
+          then: (resolve: any, reject: any) => {
+            return safeQuery(async () => {
+              const result = await query
+              return result
+            }, []).then(resolve, reject)
+          },
         }
       },
-      insert: (data: any) =>
-        safeQuery(() => originalFrom.insert(data), null),
+      insert: (data: any) => {
+        const insertQuery = originalFrom.insert(data)
+        return safeQuery(async () => {
+          const result = await insertQuery
+          return result
+        }, null)
+      },
       update: (data: any) => ({
-        eq: (column: string, value: any) =>
-          safeQuery(() => originalFrom.update(data).eq(column, value), null),
+        eq: (column: string, value: any) => {
+          const updateQuery = originalFrom.update(data).eq(column, value)
+          return safeQuery(async () => {
+            const result = await updateQuery
+            return result
+          }, null)
+        },
       }),
       delete: () => ({
-        eq: (column: string, value: any) =>
-          safeQuery(() => originalFrom.delete().eq(column, value), null),
+        eq: (column: string, value: any) => {
+          const deleteQuery = originalFrom.delete().eq(column, value)
+          return safeQuery(async () => {
+            const result = await deleteQuery
+            return result
+          }, null)
+        },
       }),
     }
   },
