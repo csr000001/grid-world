@@ -96,7 +96,7 @@ function UploadPageContent() {
 
         // 监听会话变化（登录/登出）
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
-          (_, newSession) => setSession(newSession)
+          (_event: any, newSession: any) => setSession(newSession)
         );
 
         // 2. 拉取所有格子数据
