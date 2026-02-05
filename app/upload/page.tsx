@@ -204,7 +204,7 @@ function UploadPageContent() {
         .from('grid-photos')
         .upload(fileName, file);
 
-      if (uploadError) throw new Error(`照片上传失败: ${uploadError.message}`);
+      if (uploadError) throw new Error(`照片上传失败: ${String(uploadError)}`);
 
       // 获取照片公共URL
       const { data: urlData } = await supabase
