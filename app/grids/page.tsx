@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useRef, useCallback } from 'react'
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase-v2'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import * as PIXI from 'pixi.js'
