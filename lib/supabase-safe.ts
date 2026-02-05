@@ -1,67 +1,49 @@
 import { supabase } from './supabase'
 
 /**
- * Safe wrapper for Supabase queries
- * Handles errors gracefully and prevents Object.values errors
- */
-
-export async function safeSupabaseQuery<T>(
-  queryFn: () => Promise<any>,
-  fallback: T
-): Promise<{ data: T; error: any }> {
-  try {
-    const result = await queryFn()
-
-    // Check if result is valid
-    if (!result || typeof result !== 'object') {
-      console.warn('Invalid Supabase query result:', result)
-      return { data: fallback, error: null }
-    }
-
-    // Return data or fallback
-    return {
-      data: result.data ?? fallback,
-      error: result.error ?? null
-    }
-  } catch (error) {
-    console.error('Supabase query error:', error)
-    return { data: fallback, error }
-  }
-}
-
-/**
  * Check if Supabase is properly configured
  */
 export function isSupabaseConfigured(): boolean {
   try {
+    if (typeof process === 'undefined' || !process.env) {
+      return false
+    }
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-    return !!(url && !url.includes('placeholder') && !url.includes('localhost'))
+    return !!(url && typeof url === 'string' && !url.includes('placeholder') && !url.includes('localhost'))
   } catch {
     return false
   }
 }
 
 /**
- * Safe Supabase client that shows user-friendly errors
+ * Safe Supabase client that prevents errors when not configured
  */
 export const safeSupabase = {
   from: (table: string) => {
+    // If not configured, return mock that never makes network requests
     if (!isSupabaseConfigured()) {
-      console.warn(`⚠️ Supabase not configured. Query to '${table}' will fail.`)
+      const emptyResult = { data: [], error: null }
+      const emptyPromise = Promise.resolve(emptyResult)
 
-      // Return a mock query builder that always returns empty data
       return {
         select: () => ({
-          order: () => Promise.resolve({ data: [], error: null }),
-          eq: () => Promise.resolve({ data: [], error: null }),
+          order: () => emptyPromise,
+          eq: () => emptyPromise,
           single: () => Promise.resolve({ data: null, error: null }),
+          limit: () => emptyPromise,
         }),
-        insert: () => Promise.resolve({ data: null, error: null }),
-        update: () => Promise.resolve({ data: null, error: null }),
-        delete: () => Promise.resolve({ data: null, error: null }),
+        insert: () => emptyPromise,
+        update: () => ({
+          eq: () => emptyPromise,
+        }),
+        delete: () => ({
+          eq: () => emptyPromise,
+        }),
+        upsert: () => emptyPromise,
       }
     }
 
+    // If configured, use real Supabase client
     return supabase.from(table)
   },
 

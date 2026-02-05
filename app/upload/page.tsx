@@ -101,13 +101,8 @@ function UploadPageContent() {
         );
 
         // 2. 拉取所有格子数据
-        const { data: gridsData, error: gridsError } = await safeSupabase.from('grids').select('*').order('id') as any;
-
-        if (gridsError) {
-          console.error('Failed to fetch grids:', gridsError);
-        }
-
-        const gridsArray: GridData[] = gridsData || [];
+        const queryResult = await safeSupabase.from('grids').select('*').order('id') as any;
+        const gridsArray: GridData[] = queryResult?.data || [];
         setGrids(gridsArray);
 
         // 3. 动态扩展格子（填充率超50%时）
