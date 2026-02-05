@@ -6,7 +6,8 @@
       "Bash(npm uninstall @airwallex/components-sdk)",
       "Bash(node scripts/check-deployment.js:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(echo:*)"
     ]
   }
 }
