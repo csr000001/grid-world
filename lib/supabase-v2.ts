@@ -203,6 +203,28 @@ export const supabase = {
         return { data: { user: null }, error }
       }
     },
+    signUp: async (credentials: any) => {
+      if (!isConfigured) {
+        console.warn('Supabase not configured')
+        return { data: { user: null, session: null }, error: { message: 'Supabase not configured' } }
+      }
+      try {
+        return await client.auth.signUp(credentials)
+      } catch (error) {
+        return { data: { user: null, session: null }, error }
+      }
+    },
+    signInWithPassword: async (credentials: any) => {
+      if (!isConfigured) {
+        console.warn('Supabase not configured')
+        return { data: { user: null, session: null }, error: { message: 'Supabase not configured' } }
+      }
+      try {
+        return await client.auth.signInWithPassword(credentials)
+      } catch (error) {
+        return { data: { user: null, session: null }, error }
+      }
+    },
     signInWithOAuth: async (options: any) => {
       if (!isConfigured) {
         console.warn('Supabase not configured')
