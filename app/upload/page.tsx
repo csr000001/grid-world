@@ -1,8 +1,7 @@
 'use client';
 import { useState, useEffect, useRef, Suspense } from 'react';
 import { Grid } from 'react-window';
-import { supabase } from '@/lib/supabase';
-import { safeSupabase, isSupabaseConfigured } from '@/lib/supabase-safe';
+import { supabase, SUPABASE_CONFIGURED } from '@/lib/supabase-v2';
 import { v4 as uuidv4 } from 'uuid';
 import AuthModal from '@/components/AuthModal';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -78,7 +77,7 @@ function UploadPageContent() {
         setLoading(true);
 
         // Check if Supabase is configured
-        if (!isSupabaseConfigured()) {
+        if (!SUPABASE_CONFIGURED) {
           console.warn('⚠️ Supabase not configured. App will run in demo mode.');
           setLoading(false);
           return;
@@ -101,7 +100,7 @@ function UploadPageContent() {
         );
 
         // 2. 拉取所有格子数据
-        const queryResult = await safeSupabase.from('grids').select('*').order('id') as any;
+        const queryResult = await supabase.from('grids').select('*').order('id', { ascending: true });
         const gridsArray: GridData[] = queryResult?.data || [];
         setGrids(gridsArray);
 
