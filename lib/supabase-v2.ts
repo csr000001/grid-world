@@ -71,14 +71,20 @@ export const supabase = {
       const emptyResult = Promise.resolve({ data: [], error: null })
       const emptyNullResult = Promise.resolve({ data: null, error: null })
 
+      const mockChainableQuery: any = {
+        order: () => emptyResult,
+        eq: () => mockChainableQuery,
+        gte: () => mockChainableQuery,
+        gt: () => mockChainableQuery,
+        lte: () => mockChainableQuery,
+        lt: () => mockChainableQuery,
+        single: () => emptyNullResult,
+        limit: () => emptyResult,
+        then: (resolve: any) => emptyResult.then(resolve),
+      }
+
       return {
-        select: () => ({
-          order: () => emptyResult,
-          eq: () => emptyResult,
-          single: () => emptyNullResult,
-          limit: () => emptyResult,
-          then: (resolve: any) => emptyResult.then(resolve),
-        }),
+        select: () => mockChainableQuery,
         insert: () => emptyNullResult,
         update: () => ({
           eq: () => emptyNullResult,
@@ -95,30 +101,43 @@ export const supabase = {
       select: (columns = '*') => {
         const query = originalFrom.select(columns)
 
-        return {
+        const buildChainableQuery = (currentQuery: any): any => ({
           order: (column: string, options?: any) => {
-            const orderedQuery = query.order(column, options)
+            const orderedQuery = currentQuery.order(column, options)
             return safeQuery(async () => {
               const result = await orderedQuery
               return result
             }, [])
           },
           eq: (column: string, value: any) => {
-            const filteredQuery = query.eq(column, value)
-            return safeQuery(async () => {
-              const result = await filteredQuery
-              return result
-            }, [])
+            const filteredQuery = currentQuery.eq(column, value)
+            return buildChainableQuery(filteredQuery)
+          },
+          gte: (column: string, value: any) => {
+            const filteredQuery = currentQuery.gte(column, value)
+            return buildChainableQuery(filteredQuery)
+          },
+          gt: (column: string, value: any) => {
+            const filteredQuery = currentQuery.gt(column, value)
+            return buildChainableQuery(filteredQuery)
+          },
+          lte: (column: string, value: any) => {
+            const filteredQuery = currentQuery.lte(column, value)
+            return buildChainableQuery(filteredQuery)
+          },
+          lt: (column: string, value: any) => {
+            const filteredQuery = currentQuery.lt(column, value)
+            return buildChainableQuery(filteredQuery)
           },
           single: () => {
-            const singleQuery = query.single()
+            const singleQuery = currentQuery.single()
             return safeQuery(async () => {
               const result = await singleQuery
               return result
             }, null)
           },
           limit: (count: number) => {
-            const limitedQuery = query.limit(count)
+            const limitedQuery = currentQuery.limit(count)
             return safeQuery(async () => {
               const result = await limitedQuery
               return result
@@ -126,11 +145,13 @@ export const supabase = {
           },
           then: (resolve: any, reject: any) => {
             return safeQuery(async () => {
-              const result = await query
+              const result = await currentQuery
               return result
             }, []).then(resolve, reject)
           },
-        }
+        })
+
+        return buildChainableQuery(query)
       },
       insert: (data: any) => {
         const insertQuery = (originalFrom as any).insert(data)
