@@ -22,17 +22,18 @@ export default function EnvCheckPage() {
     ]
 
     const status: EnvStatus[] = requiredEnvVars.map(name => {
-      const value = process.env[name]
-      const isSet = !!value
+      // 安全访问 process.env
+      const value = typeof process !== 'undefined' && process.env ? process.env[name] : undefined
+      const isSet = !!value && typeof value === 'string'
       const isValid = isSet &&
+        value.length > 5 &&
         !value.includes('your-') &&
-        !value.includes('你的') &&
-        value.length > 5
+        !value.includes('你的')
 
       return {
         name,
         isSet,
-        value: value ? `${value.substring(0, 20)}...` : undefined,
+        value: isSet && value ? `${value.substring(0, 20)}...` : undefined,
         isValid,
       }
     })
