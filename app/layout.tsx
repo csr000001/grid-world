@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
+import GlobalErrorProtection from "./components/GlobalErrorProtection";
 
 // 网站元数据配置（提升SEO，PayPal审核也会关注）
 export const metadata: Metadata = {
@@ -20,7 +21,13 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head>
+        {/* Initialize environment before any other scripts */}
+        <script src="/init.js" />
+      </head>
       <body className="min-h-screen flex flex-col">
+        {/* Global error protection - must be first */}
+        <GlobalErrorProtection />
         {/* 导航栏 */}
         <Navbar />
         {/* 页面主体 */}
