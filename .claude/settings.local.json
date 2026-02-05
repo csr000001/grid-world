@@ -3,7 +3,10 @@
     "allow": [
       "Bash(npm run build)",
       "Bash(npm install:*)",
-      "Bash(npm uninstall @airwallex/components-sdk)"
+      "Bash(npm uninstall @airwallex/components-sdk)",
+      "Bash(node scripts/check-deployment.js:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ]
   }
 }
