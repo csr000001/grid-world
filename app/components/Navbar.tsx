@@ -5,13 +5,14 @@ import { useState } from "react";
 
 export default function Navbar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const siteName = process.env.NEXT_PUBLIC_SITE_NAME || 'Grid World';
 
   return (
     <nav className="bg-white shadow-md py-4">
       <div className="container mx-auto px-4 flex justify-between items-center">
         {/* 网站Logo/名称 */}
         <Link href="/" className="text-2xl font-bold text-blue-600">
-          {process.env.NEXT_PUBLIC_SITE_NAME}
+          {siteName}
         </Link>
 
         {/* 桌面端导航 */}

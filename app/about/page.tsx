@@ -2,6 +2,8 @@ import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 
 export default function AboutPage() {
+  const siteName = process.env.NEXT_PUBLIC_SITE_NAME || 'Grid World';
+
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
@@ -13,7 +15,7 @@ export default function AboutPage() {
           <section>
             <h2 className="text-2xl font-semibold mb-4">我们的使命</h2>
             <p className="leading-relaxed">
-              {process.env.NEXT_PUBLIC_SITE_NAME} 致力于为用户提供一个创意展示和互动的平台。
+              {siteName} 致力于为用户提供一个创意展示和互动的平台。
               通过购买和定制格子，用户可以在我们的数字画布上展示自己的创意、品牌或信息。
             </p>
           </section>
