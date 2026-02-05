@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef, Suspense } from 'react';
 import { Grid } from 'react-window';
 import { supabase } from '@/lib/supabase';
+import { safeSupabase, isSupabaseConfigured } from '@/lib/supabase-safe';
 import { v4 as uuidv4 } from 'uuid';
 import AuthModal from '@/components/AuthModal';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -76,6 +77,13 @@ function UploadPageContent() {
       try {
         setLoading(true);
 
+        // Check if Supabase is configured
+        if (!isSupabaseConfigured()) {
+          console.warn('⚠️ Supabase not configured. App will run in demo mode.');
+          setLoading(false);
+          return;
+        }
+
         // 1. 获取用户登录会话
         const { data: sessionData } = await supabase.auth.getSession();
         setSession(sessionData.session);
@@ -93,7 +101,12 @@ function UploadPageContent() {
         );
 
         // 2. 拉取所有格子数据
-        const { data: gridsData } = await supabase.from('grids').select('*').order('id') as { data: GridData[] | null };
+        const { data: gridsData, error: gridsError } = await safeSupabase.from('grids').select('*').order('id') as any;
+
+        if (gridsError) {
+          console.error('Failed to fetch grids:', gridsError);
+        }
+
         setGrids(gridsData || []);
 
         // 3. 动态扩展格子（填充率超50%时）
