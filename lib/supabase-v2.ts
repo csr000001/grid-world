@@ -110,7 +110,7 @@ export const supabase = {
         }
       },
       insert: (data: any) => {
-        const insertQuery = originalFrom.insert(data)
+        const insertQuery = (originalFrom as any).insert(data)
         return safeQuery(async () => {
           const result = await insertQuery
           return result
@@ -118,7 +118,7 @@ export const supabase = {
       },
       update: (data: any) => ({
         eq: (column: string, value: any) => {
-          const updateQuery = originalFrom.update(data).eq(column, value)
+          const updateQuery = (originalFrom as any).update(data).eq(column, value)
           return safeQuery(async () => {
             const result = await updateQuery
             return result
@@ -127,7 +127,7 @@ export const supabase = {
       }),
       delete: () => ({
         eq: (column: string, value: any) => {
-          const deleteQuery = originalFrom.delete().eq(column, value)
+          const deleteQuery = (originalFrom as any).delete().eq(column, value)
           return safeQuery(async () => {
             const result = await deleteQuery
             return result
