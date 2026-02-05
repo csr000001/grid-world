@@ -154,7 +154,7 @@ function UploadPageContent() {
     };
 
     initializeApp();
-  }, [supabase, totalGrids]);
+  }, [totalGrids, searchParams]);
 
   // ======================== 选中格子时的状态更新 ========================
   useEffect(() => {
