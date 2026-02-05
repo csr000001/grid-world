@@ -10,12 +10,19 @@ const isPlaceholder =
   !supabaseUrl ||
   !supabaseAnonKey ||
   supabaseUrl.includes('你的') ||
+  supabaseUrl.includes('your-') ||
   supabaseAnonKey.includes('你的') ||
+  supabaseAnonKey.includes('your-') ||
   supabaseUrl === 'http://localhost:54321'
 
 // 如果是占位符配置，在控制台警告
-if (isPlaceholder && typeof window !== 'undefined') {
-  console.warn('⚠️ Supabase not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local')
+if (isPlaceholder) {
+  console.warn('⚠️ Supabase not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY')
+
+  // In production, throw error to prevent silent failures
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('Supabase configuration is required in production. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY environment variables.')
+  }
 }
 
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey)

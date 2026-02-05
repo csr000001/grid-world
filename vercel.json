@@ -1,0 +1,45 @@
+{
+  "buildCommand": "npm run build",
+  "devCommand": "npm run dev",
+  "installCommand": "npm install",
+  "framework": "nextjs",
+  "outputDirectory": ".next",
+  "env": {
+    "NEXT_PUBLIC_SUPABASE_URL": {
+      "description": "Supabase project URL (from Settings > API)",
+      "required": true
+    },
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY": {
+      "description": "Supabase anon/public key (from Settings > API)",
+      "required": true
+    },
+    "SUPABASE_SERVICE_ROLE_KEY": {
+      "description": "Supabase service role key (from Settings > API)",
+      "required": true
+    },
+    "NEXT_PUBLIC_PAYPAL_CLIENT_ID": {
+      "description": "PayPal Client ID (from developer.paypal.com)",
+      "required": true
+    },
+    "PAYPAL_CLIENT_SECRET": {
+      "description": "PayPal Client Secret (from developer.paypal.com)",
+      "required": true
+    },
+    "PAYPAL_WEBHOOK_ID": {
+      "description": "PayPal Webhook ID (from developer.paypal.com)",
+      "required": true
+    },
+    "NEXT_PUBLIC_APP_URL": {
+      "description": "Your application URL (e.g., https://yourdomain.com)",
+      "required": true
+    },
+    "NEXT_PUBLIC_SITE_NAME": {
+      "description": "Your site name (e.g., Grid World)",
+      "value": "Grid World"
+    },
+    "NODE_ENV": {
+      "description": "Node environment",
+      "value": "production"
+    }
+  }
+}
