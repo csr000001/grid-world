@@ -1,14 +1,24 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { Database } from './database.types'
 
-// 安全获取环境变量
+// 安全获取环境变量 - 支持客户端和服务端
 function safeGetEnv(key: string, fallback: string = ''): string {
+  // 在客户端，Next.js会将NEXT_PUBLIC_*变量注入到process.env
+  // 但我们也检查window对象以防万一
   try {
+    // 首先尝试从process.env获取（服务端和客户端都支持）
     if (typeof process !== 'undefined' && process.env && process.env[key]) {
       return String(process.env[key])
     }
+
+    // 在浏览器环境中，Next.js会将环境变量编译到代码中
+    // 所以process.env[key]应该可以直接访问
+    const envValue = process.env[key]
+    if (envValue && typeof envValue === 'string') {
+      return envValue
+    }
   } catch (e) {
-    // Ignore
+    console.warn(`Failed to get env var ${key}:`, e)
   }
   return fallback
 }
@@ -17,26 +27,40 @@ function safeGetEnv(key: string, fallback: string = ''): string {
 const supabaseUrl = safeGetEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://placeholder.supabase.co')
 const supabaseAnonKey = safeGetEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBsYWNlaG9sZGVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE2NDUxOTI4MDAsImV4cCI6MTk2MDc2ODgwMH0.placeholder')
 
+// 调试日志
+if (typeof window !== 'undefined') {
+  console.log('Supabase URL:', supabaseUrl)
+  console.log('Supabase Key (first 20 chars):', supabaseAnonKey.substring(0, 20))
+}
+
 // 检查是否配置
 const isConfigured = supabaseUrl.includes('.supabase.co') &&
                      !supabaseUrl.includes('placeholder') &&
                      !supabaseAnonKey.includes('placeholder')
 
-// 创建客户端
-let client: SupabaseClient<Database>
+// 创建客户端 - 只在配置正确时创建
+let client: SupabaseClient<Database> | null = null
 
-try {
-  client = createClient<Database>(supabaseUrl, supabaseAnonKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-      detectSessionInUrl: false,
-    },
-  })
-} catch (error) {
-  console.error('Failed to create Supabase client:', error)
-  // 创建一个假的客户端
-  client = createClient<Database>('https://placeholder.supabase.co', 'placeholder-key')
+if (isConfigured) {
+  try {
+    client = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+      },
+    })
+    if (typeof window !== 'undefined') {
+      console.log('✅ Supabase client created successfully')
+    }
+  } catch (error) {
+    console.error('Failed to create Supabase client:', error)
+    client = null
+  }
+} else {
+  if (typeof window !== 'undefined') {
+    console.warn('⚠️ Supabase not configured. App will run in demo mode.')
+  }
 }
 
 // 导出配置状态
@@ -67,7 +91,7 @@ export const supabase = {
   // 查询方法
   from: (table: string) => {
     // Check configuration BEFORE creating any query chains
-    if (!isConfigured) {
+    if (!isConfigured || !client) {
       const emptyResult = Promise.resolve({ data: [], error: null })
       const emptyNullResult = Promise.resolve({ data: null, error: null })
 
@@ -184,7 +208,7 @@ export const supabase = {
   // Auth 方法
   auth: {
     getSession: async () => {
-      if (!isConfigured) {
+      if (!isConfigured || !client) {
         return { data: { session: null }, error: null }
       }
       try {
@@ -194,7 +218,7 @@ export const supabase = {
       }
     },
     getUser: async () => {
-      if (!isConfigured) {
+      if (!isConfigured || !client) {
         return { data: { user: null }, error: null }
       }
       try {
@@ -204,7 +228,7 @@ export const supabase = {
       }
     },
     signUp: async (credentials: any) => {
-      if (!isConfigured) {
+      if (!isConfigured || !client) {
         console.warn('Supabase not configured')
         return { data: { user: null, session: null }, error: { message: 'Supabase not configured' } }
       }
@@ -215,7 +239,7 @@ export const supabase = {
       }
     },
     signInWithPassword: async (credentials: any) => {
-      if (!isConfigured) {
+      if (!isConfigured || !client) {
         console.warn('Supabase not configured')
         return { data: { user: null, session: null }, error: { message: 'Supabase not configured' } }
       }
@@ -226,7 +250,7 @@ export const supabase = {
       }
     },
     signInWithOAuth: async (options: any) => {
-      if (!isConfigured) {
+      if (!isConfigured || !client) {
         console.warn('Supabase not configured')
         return { data: { provider: null, url: null }, error: null }
       }
@@ -237,7 +261,7 @@ export const supabase = {
       }
     },
     signOut: async () => {
-      if (!isConfigured) {
+      if (!isConfigured || !client) {
         return { error: null }
       }
       try {
@@ -247,7 +271,7 @@ export const supabase = {
       }
     },
     onAuthStateChange: (callback: any) => {
-      if (!isConfigured) {
+      if (!isConfigured || !client) {
         return { data: { subscription: { unsubscribe: () => {} } } }
       }
       try {
@@ -262,7 +286,7 @@ export const supabase = {
   storage: {
     from: (bucket: string) => ({
       upload: async (path: string, file: any) => {
-        if (!isConfigured) {
+        if (!isConfigured || !client) {
           return { data: null, error: null }
         }
         try {
@@ -272,7 +296,7 @@ export const supabase = {
         }
       },
       getPublicUrl: (path: string) => {
-        if (!isConfigured) {
+        if (!isConfigured || !client) {
           return { data: { publicUrl: '' } }
         }
         try {
