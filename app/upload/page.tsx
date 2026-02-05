@@ -121,25 +121,25 @@ function UploadPageContent() {
             created_at: new Date().toISOString(),
             modified_at: null,
           }));
-          await supabase.from('grids').insert(newGrids as any);
+          await supabase.from('grids').insert(newGrids);
         }
 
         // 4. 拉取用户点赞记录（防重复点赞）
         if (sessionData.session?.user) {
-          const { data: likesData } = await supabase
+          const likesResult = await supabase
             .from('grid_likes')
             .select('grid_id')
             .eq('user_id', sessionData.session.user.id);
-          setUserLikedGrids((likesData as any)?.map((l: any) => l.grid_id) || []);
+          setUserLikedGrids((likesResult?.data as any)?.map((l: any) => l.grid_id) || []);
         }
 
         // 5. 拉取用户拥有的格子
         if (sessionData.session?.user) {
-          const { data: userGridsData } = await supabase
+          const userGridsResult = await supabase
             .from('grids')
             .select('id, storage_days')
             .eq('user_id', sessionData.session.user.id);
-          setUserGrids((userGridsData as any)?.map((g: any) => g.id) || []);
+          setUserGrids((userGridsResult?.data as any)?.map((g: any) => g.id) || []);
         }
 
         return () => {
