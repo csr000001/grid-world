@@ -107,10 +107,11 @@ function UploadPageContent() {
           console.error('Failed to fetch grids:', gridsError);
         }
 
-        setGrids(gridsData || []);
+        const gridsArray: GridData[] = gridsData || [];
+        setGrids(gridsArray);
 
         // 3. 动态扩展格子（填充率超50%时）
-        const filledCount = (gridsData || []).filter(g => g.user_id).length;
+        const filledCount = gridsArray.filter((g: GridData) => g.user_id).length;
         const fillRate = filledCount / totalGrids;
         if (fillRate >= FILL_THRESHOLD && totalGrids + EXPAND_STEP <= MAX_GRIDS) {
           const newTotal = Math.min(totalGrids + EXPAND_STEP, MAX_GRIDS);
