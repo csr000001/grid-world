@@ -31,11 +31,13 @@ function PaymentSuccessContent() {
         // 这里只需验证格子是否已更新
         await new Promise(resolve => setTimeout(resolve, 2000)); // 等待webhook处理
 
-        const { data: grid } = await supabase
+        const result = await supabase
           .from('grids')
           .select('user_id, photo_url')
           .eq('id', gridId)
-          .single<GridData>();
+          .single();
+
+        const grid = result.data as GridData | null;
 
         if (grid?.user_id && grid?.photo_url) {
           setStatus('success');
