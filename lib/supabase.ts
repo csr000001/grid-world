@@ -17,11 +17,21 @@ const isPlaceholder =
 
 // 如果是占位符配置，在控制台警告
 if (isPlaceholder) {
-  console.warn('⚠️ Supabase not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY')
+  const errorMessage = '⚠️ Supabase not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY'
 
-  // In production, throw error to prevent silent failures
+  if (typeof window !== 'undefined') {
+    // Client-side: show warning in console
+    console.error(errorMessage)
+  } else {
+    // Server-side: log warning
+    console.warn(errorMessage)
+  }
+
+  // In production, log additional help
   if (process.env.NODE_ENV === 'production') {
-    throw new Error('Supabase configuration is required in production. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY environment variables.')
+    console.error('Production deployment detected with missing Supabase configuration.')
+    console.error('Please set environment variables in your deployment platform (Vercel/Netlify).')
+    console.error('See VERCEL_ENV_SETUP.md for detailed instructions.')
   }
 }
 

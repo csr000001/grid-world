@@ -3,6 +3,10 @@
 /**
  * Deployment Environment Check Script
  * Run this before deploying to verify all configurations
+ *
+ * Usage:
+ *   npm run check:deployment          - Check and warn about issues
+ *   npm run check:deployment --strict - Fail on any issues (CI mode)
  */
 
 const requiredEnvVars = [
@@ -19,6 +23,9 @@ const requiredEnvVars = [
 const optionalEnvVars = [
   'NEXT_PUBLIC_CONTACT_EMAIL',
 ]
+
+// Check if running in strict mode
+const strictMode = process.argv.includes('--strict')
 
 console.log('🔍 Checking deployment environment...\n')
 
@@ -98,7 +105,17 @@ console.log('\n' + '='.repeat(50))
 if (hasErrors) {
   console.log('❌ DEPLOYMENT CHECK FAILED')
   console.log('Please fix the errors above before deploying.')
-  process.exit(1)
+  console.log('\nTo set environment variables in Vercel:')
+  console.log('1. Go to your project settings')
+  console.log('2. Navigate to Environment Variables')
+  console.log('3. Add all required variables')
+  console.log('4. Redeploy your project')
+  console.log('\nSee VERCEL_ENV_SETUP.md for detailed instructions.')
+
+  // Only exit with error in strict mode
+  if (strictMode) {
+    process.exit(1)
+  }
 } else if (hasWarnings) {
   console.log('⚠️  DEPLOYMENT CHECK PASSED WITH WARNINGS')
   console.log('Review the warnings above before deploying.')

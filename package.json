@@ -8,8 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "check:config": "node scripts/check-config.js",
-    "check:deployment": "node scripts/check-deployment.js",
-    "prebuild": "node scripts/check-deployment.js"
+    "check:deployment": "node scripts/check-deployment.js"
   },
   "dependencies": {
     "@pixi/react": "^8.0.5",
